@@ -1,0 +1,545 @@
+#!/usr/bin/env python
+
+# this is a frontend to phpsh.php that gives you readline
+# it is extremely awesome
+# see phpsh.php for the things you can do
+# @author dcorson
+# @date 04-10-06
+
+__author__ = "dcorson" # Dan Corson <danl@alum.mit.edu>                                                                 
+__author__ = "ccheever" # Charlie Cheever <ccheever@post.harvard.edu>                                                   
+__contributor__ = "aditya" # Aditya Aggarwal (added emacs-opening to tag support)                                       
+__contributor__ = "waffle.iron@gmail.com" # William Graham (bug fix for a better way of  choosing the correct php root) 
+__contributor__ = "marcel" # Marcel Laverdet (always using a file in the user's homedir for history)                    
+__date__ = "Apr 10, 2006"                                                                                               
+
+CTAGS = "ctags"                                                                                                         
+PHP = "php -q"                                                                                                          
+
+from subprocess import Popen, PIPE
+import readline
+import sys
+import re
+import select
+import ansicolor as clr
+import os
+import time
+
+class ProblemStartingPhp(Exception):
+    def __init__(self, fileName = None, lineNum = None):
+        self.fileName = fileName
+        self.lineNum = lineNum
+
+def phpOpen(cmd):
+    global AutocompleteIdentifiers
+    AutocompleteIdentifiers = []
+    p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+    pline = p.stdout.readline().rstrip()
+    if pline != "#start_autocomplete_identifiers":
+        errStr = p.stderr.readline().rstrip()
+        print clrErr + errStr
+        m = re.match('PHP Parse error: .* in (.*) on line ([0-9]*)', errStr)
+        if m:
+            fileName, lineNum = m.groups()
+            raise ProblemStartingPhp(fileName, lineNum)
+        else:
+            raise ProblemStartingPhp()
+    while True:
+        pline = p.stdout.readline().rstrip()
+        if pline == "#end_autocomplete_identifiers":
+            break
+        AutocompleteIdentifiers.append(pline)
+
+    return p
+
+def phpOpenAndCheck(cmd):
+    p = None
+    while not p:
+        try:
+            p = phpOpen(cmd)
+        except ProblemStartingPhp, e:
+            print clrComm + 'phpsh failed to initialize PHP.'
+            print 'Fix the problem and hit enter to reload or ctrl-C to quit.'
+            if e.lineNum:
+                print 'Type V to vim to ' + e.fileName + ':' + str(e.lineNum)
+                print clrDefault
+                if raw_input() == 'V':
+                    Popen('vim +' + str(e.lineNum) + ' ' + e.fileName,
+                        shell = True).wait()
+            else:
+                print clrDefault
+                raw_input()
+    return p
+
+def phpRestart(cmd, p):
+    try:
+        p.stdout.close()
+        p.stderr.close()
+        p.stdin.close()
+        p.wait()
+    except IOError:
+        pass
+
+    return phpOpenAndCheck(cmd)
+
+def helpMessage():
+   return """\
+-- Help --
+Type php commands and they will be evaluted each time you hit enter. Ex:
+php> $msg = "hello world"
+
+Put = at the beginning of a line as syntactic sugar for return. Ex:
+php> = 2 + 2
+4
+
+phpsh will print the returned value and also assign the last returned
+value to the variable $_.
+Anything printed to stdout by the evaluation of your input will be bolded
+so you can distinguish between what's being printed and what's being returned
+by the commands you enter.
+
+If you end a line with a backlash (\), you can enter multiline input.
+
+You can use tab to autocomplete function names, global variable names,
+constants, classes, and interfaces.  If you are using ctags, then you can hit 
+tab again after you've entered the name of a function, and it will show you 
+the signature for that function.  phpsh also supports all the normal 
+readline features, like ctrl-e, ctrl-a, and history (up, down arrows).
+
+-- phpsh quick command list --
+    h     Display this help text.
+    r     Reload (e.g. after a code change).  args to r append to add 
+            includes, like 'r ../lib/username.php' 
+            (use absolute paths or relative paths from where phpsh.php lives)
+    R     Like 'r', but change includes instead of appending
+    d     get documentation for a function or other identifier 
+             ex: 'd my_function'
+    D     like 'd', but gives more extensive documentation for builtins
+    v     open vim read-only where a function or other identifer is defined
+             ex: 'v some_function'
+    V     open vim (not read-only) and reload (r) upon return to phpsh
+    e     open emacs where a function or other identifer is defined
+             ex: 'e some_function'
+    c     add new includes without restarting, display includes.
+    i     open a mysql cli on the local db of user you specify (ex: i 1160)
+    q     quit (ctrl-D also quits)
+"""
+
+phpsh_root = os.path.dirname(os.path.realpath(__file__))                                                                
+if not phpsh_root:                                                                                                      
+        phpsh_root = os.getcwd()                                                                                            
+phpshRoot = os.path.dirname(os.path.realpath(__file__))
+
+phpRoot = phpshRoot + '/..'
+
+phpCommReadyStr = 'phpCommandLineReadyToGo'
+commApp = ';echo '+phpCommReadyStr+'OVER'
+restartStr = 'Restarting: '
+commShowStr = 'Commandline: '
+phpRe = re.compile(phpCommReadyStr+'\n')
+phpReOver = re.compile(phpCommReadyStr+'OVER\n')
+
+phpPrompt = 'php> '
+phpMorePrompt = ' ... '
+phpPromptLen = len(phpPrompt)
+
+commArgs = []
+optionsPossible = True
+testMode = False
+argI = 1
+argN = len(sys.argv)
+doColor = True
+while argI < argN:
+    arg = sys.argv[argI]
+    argDone = False
+    if optionsPossible:
+        if arg == '-t':
+            if testMode:
+                print 'Cannot load multiple test files'
+            elif argI == argN - 1:
+                print 'You did not specify a test file'
+            else:
+                testMode = True
+                testFN = sys.argv[argI + 1]
+                argI += 1
+                doColor = False
+            argDone = True
+        elif arg == '-c':
+            doColor = False
+            argDone = True
+        elif arg == '--':
+            optionsPossible = False
+            argDone = True
+    if not argDone:
+        commArgs.append(arg)
+    argI += 1
+
+commBase = PHP + " " + phpsh_root + os.path.sep + "phpsh.php"                                                           
+if not doColor:
+    commBase += ' -c'
+comm = ' '.join([commBase] +commArgs)
+
+# so many colors, so much awesome
+if not doColor:
+    clrComm = ''
+    clrPrmpt = ''
+    clrOut = ''
+    clrErr = ''
+    clrIn = ''
+    clrHelp = ''
+    clrAnnounce = ''
+    clrDefault = ''
+else:
+    clrComm = clr.Green
+    clrPrmpt = clr.Cyan
+    clrOut = clr.Default
+    clrErr = clr.Red
+    clrIn = clr.Yellow
+    clrHelp = clr.Green
+    clrAnnounce = clr.Magenta
+    clrDefault = clr.Default
+
+FunctionSignatures = {}
+try:
+    import ctags
+    Ctags = ctags.Ctags()
+    try:
+        FunctionSignatures = ctags.CtagsFunctionSignatures().functionSignatures
+    except:
+        FunctionSignatures = {}
+        print clrErr + "Problem loading function signatures"
+except ctags.CantFindTagsFile:
+    print clrAnnounce + "I can't find a tags file for you.  To enable tab completion in phpsh,\ngo to the root directory of your php code and run 'ctags -R',\n(or whatever the analagous command is with your version of ctags,)\nthen run phpsh from that directory or a subdirectory of that directory." + clr.Default
+
+except:
+    print clrErr + "Problem loading ctags"
+
+import rlcompleter
+readline.parse_and_bind("tab: complete")
+
+# persistent readline history
+# we set the history length to be something reasonable 
+# so that we don't write a ridiculously huge file every time
+# someone executes a command
+HistoryFile = os.path.join(os.environ["HOME"], ".phpsh_history")
+readline.set_history_length(100) 
+
+try:
+    readline.read_history_file(HistoryFile)
+except IOError:
+    # couldn't read history (probably one hasn't been created yet)
+    pass
+
+def unEsc(s):
+    return s.replace(phpCommReadyStr+phpCommReadyStr, phpCommReadyStr)
+
+def getEsc(pipe):
+    ret = ''
+    while True:
+        pline = pipe.readline()
+        plineKillEsc = pline.replace(phpCommReadyStr+phpCommReadyStr, '')
+        mOver = phpReOver.search(plineKillEsc)
+        if mOver:
+            plineRemain = pline[:mOver.start()]
+            ret += unEsc(plineRemain)
+            return (ret, True)
+        if phpRe.search(plineKillEsc): 
+            break
+        ret += unEsc(pline)
+    m = phpRe.search(pline)
+    plineRemain = pline[:m.start()]
+    if plineRemain != '':
+        ret += unEsc(plineRemain)
+    return (ret, False)
+
+AutocompleteIdentifiers = []
+AutocompleteCache = None
+AutocompleteMatch = None
+AutocompleteSignature = None
+def tabComplete(text, state):
+    """The completer function is called as function(text, state), for state in 0, 1, 2, ..., until it returns a non-string value."""
+
+    global AutocompleteIdentifiers, AutocompleteCache, AutocompleteMatch, FunctionSignatures, AutocompleteSignature
+
+    size = len(text)
+    if state == 0:
+        AutocompleteCache = []
+        for identifier in AutocompleteIdentifiers:
+            if identifier.startswith(text):
+                AutocompleteCache.append(identifier)
+
+        if FunctionSignatures.has_key(text):
+            for sig in FunctionSignatures[text]:
+                AutocompleteCache.append(sig)
+    try:
+        return AutocompleteCache[state]
+    except IndexError:
+        return None
+               
+print clrComm+commShowStr+comm
+p = phpOpenAndCheck(comm+commApp)
+cline = None
+
+readline.set_completer(tabComplete)
+
+# print welcome message
+print clrComm + "phpsh (c)2006 by Charlie Cheever and Dan Corson and Facebook, Inc."
+print clrHelp + "type 'h' or 'help' to see instructions & features" + clrDefault
+
+print clrAnnounce + "New Feature: You can use the -c option to turn off coloring"
+
+def updateTestPairs(testPairs, inLine, outLines, inLineLineN):
+    if inLine is None:
+        if outLines != []:
+            print 'warning: ignoring %d header lines'%len(outLines)
+    else:
+        testPairs.append((inLine, outLines, inLineLineN))
+
+# parse test file, if we have one
+# this is not perfect since output lines could start with 'php> ' (!!)
+if testMode:
+    testF = file(testFN)
+    inLine = None
+    inLineLineN = None
+    outLines = []
+    testPairs = []
+    lineN = 1
+    while True:
+        l = testF.readline()
+        if not l:
+            break
+        l = l[:-1]
+        if l.startswith(phpPrompt):
+            updateTestPairs(testPairs, inLine, outLines, inLineLineN)
+            outLines = []
+            inLine = l[phpPromptLen:]
+            inLineLineN = lineN
+        elif inLine:
+            outLines.append(l)
+        lineN += 1
+    updateTestPairs(testPairs, inLine, outLines, inLineLineN)
+    testF.close()
+    testPairsIter = testPairs.__iter__()
+    testCur = None
+
+try:
+    while True:
+        (out, died) = getEsc(p.stdout)
+        err = ''
+        select.poll().register(p.stderr)
+       
+        outS = None
+        errS = None
+        if not died:
+            while select.select([p.stderr], [], [], 0.05) != ([], [], []):
+                err += p.stderr.read(1)
+
+            # suppress error printing to stdout if the same error is being sent
+            # to both stdout and stderr
+            errS = err.strip()[4:].replace(":  ", ": ")
+            # strip out the coloring chars
+            outS = out[4:][:-4].strip()
+        if testMode:
+            testCheck = ''
+        if out and (not outS or errS != outS):
+            outN = out + '\n'
+            if testMode:
+                testCheck += outN
+            else:
+                sys.stdout.write(clrOut + outN)
+        if err:
+            errN = err + '\n'
+            if testMode:
+                testCheck += errN
+            else:
+                sys.stdout.write(clrErr + errN)
+        if died:
+            while select.select([p.stderr], [], [], 0.05) != ([], [], []):
+                c = p.stderr.read(1)
+                if c == '': break
+                err += c
+            sys.stdout.write(clrErr+err+"\n")
+            print clrComm + "PHP died. " + restartStr + comm
+            p = phpOpenAndCheck(comm+commApp)
+            initializedSuccessfully = False
+            died = False
+            continue
+         
+        if testMode:
+            if testCur is not None:
+                testExpected = '\n'.join(testCur[1])
+                testCheck = testCheck[:-1]
+                if testExpected == testCheck:
+                    pass
+                    #print 'Line '+str(testCur[2])+' is good.'
+                else:
+                    print 'ERROR Line '+str(testCur[2])+' mismatch:'
+                    print '---Command:---'
+                    print testCur[0]
+                    print '---Expected:---'
+                    print testExpected
+                    print '---Got:---'
+                    print testCheck
+                    print '----------'
+            try:
+                testCur = testPairsIter.next()
+                cline = testCur[0]
+            except StopIteration:
+                break
+        else:
+            try:
+                if cline and cline[-1] == "\\":
+                    prompt = phpMorePrompt
+                else:
+                    prompt = phpPrompt
+                cline = raw_input(clrPrmpt + prompt + clrIn)
+            except EOFError:
+                break
+            except KeyboardInterrupt:
+                break
+            
+        if cline == 'r' or cline == 'R': # reload, after code edit, but keep readline history
+            print clrComm+restartStr+comm
+            initializedSuccessfully = False
+            p = phpRestart(comm+commApp, p)
+        elif cline.startswith('r '): # add args to phpsh.php (includes), reload
+            args = cline[1:]
+            comm += args
+            initializedSuccessfully = False
+            print clrComm+restartStr+comm
+            p = phpRestart(comm+commApp, p)
+        elif cline.startswith('R '): # change args to phpsh.php (includes), reload
+            comm = commBase
+            args = cline[1:]
+            comm += args
+            initializedSuccessfully = False
+            print clrComm+restartStr+comm
+            p = phpRestart(comm+commApp, p)
+        elif cline == 'c' or cline == 'C': # current command
+            print clrComm+commShowStr+comm
+            p.stdin.write("\n")
+        elif cline.startswith('c '): # add args to phpsh.php (includes)
+            args = cline[1:]
+            comm += args
+            print clrComm+commShowStr+comm
+            p.stdin.write("\n")
+        elif cline.startswith('C '): # change args to phpsh.php (includes)
+            comm = commBase
+            args = cline[1:]
+            comm += args
+            print clrComm+commShowStr+comm
+            p.stdin.write("\n")
+        elif cline.startswith('d ') or cline.startswith('D '):
+            identifier = cline[2:]
+            if identifier.startswith('$'):
+                identifier = identifier[1:]
+            lookupDocumentation = True
+            try:
+                tags = Ctags.pyTags[identifier]
+            except KeyError:
+                print clrHelp + "no ctag info found for '" + identifier + "'"
+                lookupDocumentation = False
+            except NameError:
+                print clrHelp + "documentation requires ctags"
+                lookupDocumentation = False
+            if lookupDocumentation:
+                print clrHelp + repr(tags)
+                for t in tags:
+                    try:
+                        file = Ctags.tagsRoot + os.path.sep + t["file"]
+                        doc = ""
+                        append = False
+                        lineNum = 0
+                        for line in open(file):
+                            lineNum += 1
+                            if not append:
+                                if line.find("/*") != -1:
+                                    append = True
+                                    docStartLine = lineNum
+                            if append:
+                                if line.find(t["context"]) != -1:
+                                    print "%s, lines %d-%d:" % (file, docStartLine, lineNum)
+                                    print doc
+                                    break
+                                if line.find("*") == -1:
+                                    append = False
+                                    doc = ""
+                                else:
+                                    doc += line
+                    except:
+                        pass
+            print clrDefault
+        elif cline.startswith('v ') or cline.startswith('V '): # vim -t
+            readOnly = cline.startswith('v ')
+            tag = cline[2:]
+            if tag.startswith('$'):
+                tag = tag[1:]
+            if Ctags.pyTags.has_key(tag):
+                if readOnly:
+                    vim = "vim -R"
+                else:
+                    vim = "vim "
+                vim = vim + ' -c "set tags=' + Ctags.tagsFile + '" -t ' 
+                pVim = Popen(vim + tag, shell=True)
+                pVim.wait()
+                p.stdin.write("\n")
+                if not readOnly:
+                  print clrComm+restartStr+comm
+                  p = phpOpenAndCheck(comm+commApp)
+            else:
+                print clrComm + "no tag '" + tag + "' found"
+                p.stdin.write("\n")
+        elif cline.startswith('e '): # emacs support
+            tag = cline[2:]
+            if tag.startswith('$'):
+                tag = tag[1:]
+            if Ctags.pyTags.has_key(tag):
+                t = Ctags.pyTags[tag][0]
+                # need to get the starting line number (this will suffice until
+                # we figure out how to start up emacs at a particular tag location
+                try:
+                    file = Ctags.tagsRoot + os.path.sep + t["file"]
+                    doc = ""
+                    append = False
+                    lineNum = 1
+                    foundTag = False
+                    for line in open(file):
+                        lineNum += 1
+                        if line.find(t["context"]) != -1:
+                            emacsLine = lineNum
+                            foundTag = True
+                            break
+                except:
+                    pass
+                if (foundTag):
+                    # -nw opens it in the terminal instead of using X
+                    cmd = 'emacs -nw +%d %s' % (emacsLine, file)
+                    pEmacs = Popen(cmd, shell=True)
+                    pEmacs.wait()
+                    p.stdin.write("\n")
+                else:
+                    print clrComm + "no tag '" + tag + "' found"
+                    p.stdin.write("\n")                    
+            else:
+                print clrComm + "no tag '" + tag + "' found"
+                p.stdin.write("\n")
+
+        elif cline == 'h' or cline == 'help': # help
+            print clrHelp + helpMessage() + comm
+            p.stdin.write("\n")
+        elif cline == 'q' or cline == 'exit' or cline == 'exit;': # quit
+            break
+        else:
+            p.stdin.write(cline+"\n")
+
+        initializedSuccessfully = True
+        try:
+            readline.write_history_file(HistoryFile)
+        except IOError:
+            # couldn't write history file, probably b/c we don't have write permissions in this dir
+            pass
+except KeyboardInterrupt:
+    print clrDefault
+
+print clrDefault
+
