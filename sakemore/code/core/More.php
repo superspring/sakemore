@@ -40,7 +40,20 @@ class More extends Controller {
 		}
 
 		// Run the given command.
-		list($class, $function) = $allcommands[$cmd];
+		if (count($allcommands[$cmd]) == 2) {
+			list($class, $function) = $allcommands[$cmd];
+			$argarray = false;
+		}
+		else {
+			list($class, $function, $argarray) = $allcommands[$cmd];
+		}
+
+		// Passing the arguments as one array or individual arguments?
+		if ($argarray) {
+			// One single array? Useful for when using unlimited arguments.
+			$cmdargs = array($cmdargs);
+		}
+
 		$object = null;
 		if (is_object($class)) {
 			// Passed an object instead of a static class? Ok.
@@ -69,6 +82,15 @@ class More extends Controller {
 	 * Gets a list of available commands.
 	 */
 	protected function availableCommands() {
+		/*
+		 * key - This is unique to each command.
+		 *     - The command - 'sake more [command] [args]'
+		 * value is an array
+		 *   1. $this - The object to call or null for a static call.
+		 *   2. method name - The function to call on that object/class.
+		 *   3. (Optional) - settings - array.
+		 *   - 'args' => 'many' (default) or 'single' - Are all arguments passed as a single array or individual function arguments?
+		 */
 		$list = array(
 			'help' => array($this, 'getHelp'),
 		);
