@@ -7,8 +7,8 @@
     "authors": [
         {
             "name": "Timothy Best",
-            "email": "superspring@gmail.com"
-            "role": "Developer",
+            "email": "superspring@gmail.com",
+            "role": "Developer"
         }
     ],
     "homepage": "https://github.com/superspring/sakemore",
