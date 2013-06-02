@@ -1,0 +1,18 @@
+{
+    "name": "silverstripe/sakemore",
+    "type": "library",
+    "description": "Adds command line tools to the Silverstripe framework.",
+    "keywords": ["sake", "sakemore", "sake more"],
+    "license": "GPL",
+    "authors": [
+        {
+            "name": "Timothy Best",
+            "email": "superspring@gmail.com"
+            "role": "Developer",
+        }
+    ],
+    "homepage": "https://github.com/superspring/sakemore",
+    "require": {
+        "php": ">5.1.0"
+    }
+}
