@@ -64,7 +64,11 @@ class More extends Controller {
 		$response = $method->invokeArgs($object, $cmdargs);
 
 		// Print the response.
-		printf("%s\n", $response);
+		if (!is_null($response)) {
+			printf("%s\n", $response);
+		}
+
+		// Done.
 		die();
 	}
 

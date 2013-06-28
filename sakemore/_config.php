@@ -10,3 +10,4 @@ $_FILE_TO_URL_MAPPING[$basepath] = 'http://localhost';
 Object::add_extension('More', 'UserPasswordRole');
 Object::add_extension('More', 'SQLConsoleRole');
 Object::add_extension('More', 'ConsoleRole');
+Object::add_extension('More', 'FlushCacheRole');
