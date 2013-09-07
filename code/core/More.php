@@ -114,7 +114,7 @@ class More extends Controller {
 	/**
 	 * Display available help information.
 	 */
-	public function getHelp() {
+	public function getHelp($item = null) {
 		// Prepare variables.
 		$briefs = array();
 		$parameters = array();
@@ -128,6 +128,11 @@ class More extends Controller {
 		$commands = array_unique(array_merge(
 			array_keys($briefs), array_keys($parameters), array_keys($examples)
 		));
+
+		// Filter this to a single command?
+		if (!is_null($item) && in_array($item, $commands)) {
+			$commands = array($item);
+		}
 
 		// Display the data.
 		echo "Help details for sake:\n";
