@@ -17,6 +17,7 @@ class More extends Controller {
 			// If it's not, redirect to the homepage.
 			Director::redirect('/');
 			parent::init();
+			return;
 		}
 
 		// What're the command and arguments?
@@ -76,10 +77,8 @@ class More extends Controller {
 	 * Determines if this script is being run via the command line.
 	 */
 	protected function isCli() {
-		if (!defined('PHP_SAPI')) {
-			return false;
-		}
-		return PHP_SAPI === 'cli';
+		$sapi = php_sapi_name();
+		return $sapi === 'cli';
 	}
 
 	/**
