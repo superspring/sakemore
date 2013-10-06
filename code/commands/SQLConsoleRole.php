@@ -71,13 +71,12 @@ class SQLConsoleRole extends DataExtension {
 				break;
 
 			case 'PostgreSQLDatabase':
-				$command[] = 'psql';
+				$command[] = sprintf('PGPASSWORD=%s psql', escapeshellarg($databaseConfig['password']));
 				foreach (array(
 					'database' => 'dbname',
 					'server'   => 'host',
 					'port'     => 'port',
 					'username' => 'username',
-					'password' => 'password',
 				) as $config_key => $command_key) {
 					if (array_key_exists('server', $databaseConfig)) {
 						$command[] = sprintf('--%s=%s', $command_key, escapeshellarg($databaseConfig[$config_key]));
