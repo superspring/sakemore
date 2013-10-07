@@ -64,7 +64,7 @@ class SQLConsoleRole extends DataExtension {
 					'username' => 'user',
 					'password' => 'password',
 				) as $config_key => $command_key) {
-					if (array_key_exists('server', $databaseConfig)) {
+					if (array_key_exists($config_key, $databaseConfig)) {
 						$command[] = sprintf('--%s=%s', $command_key, escapeshellarg($databaseConfig[$config_key]));
 					}
 				}
