@@ -1,8 +1,8 @@
 {
-	"name": "silverstripe/sakemore",
-	"description": "Adds command line tools to the Silverstripe framework.",
+	"name": "stripelabs/sakemore",
+	"description": "A command line tool for interfacing with Silverstripe.",
 	"type": "silverstripe-module",
-	"keywords": ["sake", "sakemore", "sake more", "cli", "command line", "cron"],
+	"keywords": ["sake", "sakemore", "sake more", "cli", "command line", "clear cache", "cache", "dump", "password", "pwd", "php"],
 	"license": "BSD-3-Clause",
 	"authors": [{
 		"name": "Timothy Best",
