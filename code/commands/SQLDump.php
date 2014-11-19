@@ -56,11 +56,11 @@ class SQLDump extends DataExtension {
 		// Provide the command required to run the interface.
 		switch ($databaseConfig['type']) {
 			case 'MySQLDatabase':
-				$command[] = 'mysql';
+				$command[] = 'mysqldump';
 				foreach (array(
 					'server'   => 'host',
 					'port'     => 'port',
-					'user'     => 'user',
+					'username' => 'user',
 					'password' => 'password',
 				) as $config_key => $command_key) {
 					if (array_key_exists($config_key, $databaseConfig)) {
