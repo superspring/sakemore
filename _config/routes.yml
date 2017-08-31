@@ -1,0 +1,6 @@
+---
+Name: sakemore-routes
+---
+Director:
+  rules:
+    'more': '\SilverStripe\Sakemore\Core\More'

@@ -5,10 +5,6 @@
 global $_FILE_TO_URL_MAPPING;
 $basepath = dirname(getcwd());
 $_FILE_TO_URL_MAPPING[$basepath] = 'http://localhost';
-
-// This is a list of commands for 'sake more'.
-Object::add_extension('More', 'UserPasswordRole');
-Object::add_extension('More', 'SQLConsoleRole');
-Object::add_extension('More', 'ConsoleRole');
-Object::add_extension('More', 'FlushCacheRole');
-Object::add_extension('More', 'SQLDump');
+if (!array_key_exists('HTTP_HOST', $_SERVER)) {
+  $_SERVER['HTTP_HOST'] = 'localhost';
+}

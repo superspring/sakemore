@@ -1,0 +1,7 @@
+SilverStripe\Sakemore\Core\More:
+  extensions:
+    - \SilverStripe\Sakemore\Commands\UserPasswordRole
+    - \SilverStripe\Sakemore\Commands\SQLConsoleRole
+    - \SilverStripe\Sakemore\Commands\ConsoleRole
+    - \SilverStripe\Sakemore\Commands\FlushCacheRole
+    - \SilverStripe\Sakemore\Commands\SQLDump
