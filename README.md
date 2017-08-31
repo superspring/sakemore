@@ -69,4 +69,6 @@ Installation
  * Set up your database, etc
  * Run: "sudo apt-get install php5-cli python"
  * Run: "composer require silverstripe/sakemore dev-master"
+ * Run: "alias sake='./framework/sake'" # This can be replaced with similar.
+ * Run: "sake dev/build flush=1" # In order to rebuild all the caches.
  * Run: "sake more help"

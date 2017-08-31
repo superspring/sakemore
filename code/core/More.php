@@ -1,23 +1,36 @@
 <?php
+
+namespace SilverStripe\Sakemore\Core;
+
+use Controller;
+use ReflectionMethod;
+
 /**
  * This class defines the base 'more' URL used with sake.
  */
-class More extends Controller {
+class More extends Controller
+{
 	/**
 	 * All sake more commands are prefixed with the 'more' URL.
 	 */
-	public $url_base = 'more';
+	private static $url_handlers = array(
+		'' => 'init',
+	);
+	private static $allowed_actions = array(
+		'init',
+	);
 
 	/**
 	 * Prepare to run a sake more command.
 	 */
 	public function init() {
+
 		// Ensure it's being run via the command line.
 		if (!$this->isCli()) {
+
 			// If it's not, redirect to the homepage.
-			Director::redirect('/');
-			parent::init();
-			return;
+			$this->redirect('/');
+			return parent::init();
 		}
 
 		// What're the command and arguments?
@@ -30,14 +43,20 @@ class More extends Controller {
 
 		// Validate them.
 		if (empty($cmdargs)) {
-			return $this->showError('Expected parameter. Type "sake more help" for a list of commands');
+			return $this->showError(
+				'Expected parameter. Type "sake more help" for a list of commands'
+			);
 		}
+
 		// Get all the potential commands.
 		$allcommands = $this->availableCommands();
+
 		// Which command is being called?
 		$cmd = array_shift($cmdargs);
 		if (!array_key_exists($cmd, $allcommands)) {
-			return $this->showError("Unable to find command '$cmd'. Run 'sake more help' for list of commands");
+			return $this->showError(
+				"Unable to find command '$cmd'. Run 'sake more help' for list of commands"
+			);
 		}
 
 		// Run the given command.
@@ -77,7 +96,11 @@ class More extends Controller {
 	 * Determines if this script is being run via the command line.
 	 */
 	protected function isCli() {
+
+		// Prepare variables.
 		$sapi = php_sapi_name();
+
+		// Done.
 		return $sapi === 'cli';
 	}
 
@@ -94,10 +117,16 @@ class More extends Controller {
 		 *   3. (Optional) - settings - array.
 		 *   - 'args' => 'many' (default) or 'single' - Are all arguments passed as a single array or individual function arguments?
 		 */
+
+		// Prepare variables.
 		$list = array(
 			'help' => array($this, 'getHelp'),
 		);
+
+		// Add the others to the list.
 		$this->extend('commands', $list);
+
+		// Done.
 		return $list;
 	}
 
@@ -114,6 +143,7 @@ class More extends Controller {
 	 * Display available help information.
 	 */
 	public function getHelp($item = null) {
+
 		// Prepare variables.
 		$briefs = array();
 		$parameters = array();

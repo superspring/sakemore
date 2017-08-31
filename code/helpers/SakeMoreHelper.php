@@ -1,8 +1,12 @@
 <?php
+
+namespace Silverstripe\Sakemore\Helpers;
+
 /**
  * This class contains helper methods designed for sake scripts.
  */
-class SakeMoreHelper {
+class SakeMoreHelper
+{
 	/**
 	 * Runs the given datbase command.
 	 *
@@ -13,6 +17,7 @@ class SakeMoreHelper {
 	 *   Exit code.
 	 */
 	public static function runCLI($command) {
+
 		// Prepare variables.
 		$pipes = array();
 
