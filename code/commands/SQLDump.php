@@ -1,4 +1,10 @@
 <?php
+
+namespace SilverStripe\Sakemore\Commands;
+
+use DataExtension;
+use Silverstripe\Sakemore\Helpers\SakeMoreHelper;
+
 /**
  * Provides shell access to the database used by the site.
  */

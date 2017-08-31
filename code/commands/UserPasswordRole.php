@@ -1,4 +1,9 @@
 <?php
+
+namespace SilverStripe\Sakemore\Commands;
+
+use DataExtension;
+
 /**
  * This class gives the ability to change a user's password.
  */

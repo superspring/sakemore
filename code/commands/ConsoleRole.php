@@ -1,4 +1,10 @@
 <?php
+
+namespace SilverStripe\Sakemore\Commands;
+
+use DataExtension;
+use Silverstripe\Sakemore\Helpers\SakeMoreHelper;
+
 /**
  * Provides an interactive PHP interface to the site.
  */
